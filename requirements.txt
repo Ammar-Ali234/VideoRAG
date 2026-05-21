@@ -1,5 +1,5 @@
 streamlit
-yt-dlp
+yt-dlp>=2026.05.01
 openai-whisper
 faiss-cpu
 sentence-transformers
