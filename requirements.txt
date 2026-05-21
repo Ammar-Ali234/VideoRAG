@@ -1,7 +1,10 @@
 streamlit
-yt-dlp>=2026.05.01
+yt-dlp
 openai-whisper
-faiss-cpu
 sentence-transformers
+faiss-cpu
 numpy
+torch
+opencv-python-headless
+imageio-ffmpeg
 torchvision
