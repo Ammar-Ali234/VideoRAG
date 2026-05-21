@@ -5,7 +5,11 @@ import os
 import uuid
 import faiss
 import numpy as np
+import imageio_ffmpeg
+
 from sentence_transformers import SentenceTransformer
+
+os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
 
 # ==========================================
 # PAGE CONFIG
