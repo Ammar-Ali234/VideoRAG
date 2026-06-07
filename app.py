@@ -6,19 +6,66 @@ import uuid
 import faiss
 import numpy as np
 import imageio_ffmpeg
+import shutil
 
 from sentence_transformers import SentenceTransformer
+
+os.environ["HF_HOME"] = "/tmp/huggingface"
 
 os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
 
 # ==========================================
-# PAGE CONFIG
+# PAGE CONFIG & STYLING
 # ==========================================
 
 st.set_page_config(
     page_title="YouTube Video Q&A",
+    page_icon="🎥",
     layout="wide"
 )
+
+# Custom CSS for a premium look
+st.markdown("""
+<style>
+    .main {
+        background-color: #0e1117;
+    }
+    .stTextInput > div > div > input {
+        background-color: #1a1c24;
+        color: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #3e424b;
+    }
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        background-color: #ff4b4b;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background-color: #ff2b2b;
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4);
+        transform: translateY(-2px);
+    }
+    .status-card {
+        padding: 20px;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid #334155;
+        margin-bottom: 20px;
+    }
+    h1 {
+        color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+    }
+    .stMarkdown p {
+        color: #94a3b8;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # LOAD MODELS
@@ -26,8 +73,10 @@ st.set_page_config(
 
 @st.cache_resource
 def load_models():
-    whisper_model = whisper.load_model("base")
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    whisper_model = whisper.load_model("tiny")
+    embedder = SentenceTransformer(
+    "sentence-transformers/all-MiniLM-L6-v2"
+)
     return whisper_model, embedder
 
 whisper_model, embedder = load_models()
@@ -41,25 +90,30 @@ def download_youtube(url, out_dir="videos"):
     os.makedirs(out_dir, exist_ok=True)
 
     video_id = str(uuid.uuid4())
-
-    output_path = os.path.join(out_dir, f"{video_id}.mp4")
+    output_path = os.path.join(out_dir, video_id)
 
     ydl_opts = {
-        "format": "best[ext=mp4]",
-        "outtmpl": output_path,
+        "format": "bestaudio/best",
+        "outtmpl": f"{output_path}.%(ext)s",
         "quiet": True,
         "noplaylist": True,
         "nocheckcertificate": True,
         "geo_bypass": True,
         "http_headers": {
             "User-Agent": "Mozilla/5.0"
-        }
+        },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-    return output_path
+    final_path = f"{output_path}.mp3"
+    return final_path
 
 # ==========================================
 # TRANSCRIBE VIDEO
@@ -156,17 +210,23 @@ if "index" not in st.session_state:
 
 st.title("🎥 YouTube Video Q&A System")
 
-st.markdown(
-    "Ask questions from any YouTube video using Whisper + FAISS."
-)
+col1, col2 = st.columns([2, 1])
 
-url = st.text_input("Enter YouTube Video URL")
+with col1:
+    st.markdown(
+        "### Ask questions from any YouTube video using Whisper + FAISS."
+    )
+    url = st.text_input("Enter YouTube Video URL", placeholder="https://www.youtube.com/watch?v=...")
+
+with col2:
+    st.write("##") # Spacing
+    process_button = st.button("🚀 Process Video")
 
 # ==========================================
 # PROCESS VIDEO
 # ==========================================
 
-if st.button("Process Video"):
+if process_button:
 
     if not url:
 
@@ -183,6 +243,13 @@ if st.button("Process Video"):
 
             with st.spinner("🧠 Transcribing video with Whisper..."):
                 chunks = transcribe(video_path)
+
+            # Cleanup: Remove audio file after transcription
+            if os.path.exists(video_path):
+                os.remove(video_path)
+
+            if os.path.exists("videos"):
+                shutil.rmtree("videos")
 
             st.success("Transcription completed!")
 
